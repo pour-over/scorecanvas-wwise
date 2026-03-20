@@ -1,9 +1,8 @@
 import fs from 'fs';
 import path from 'path';
-import { parseString } from 'xml2js';
-import { promisify } from 'util';
+import { parseStringPromise } from 'xml2js';
 
-const parseXml = promisify(parseString);
+const parseXml = parseStringPromise;
 
 // -------------------------------------------------------
 // Types for the imported Wwise project structure

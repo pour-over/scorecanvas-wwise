@@ -1,8 +1,8 @@
+@import '@xyflow/react/dist/style.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import '@xyflow/react/dist/style.css';
 
 /* React Flow dark theme overrides */
 .react-flow__background {
