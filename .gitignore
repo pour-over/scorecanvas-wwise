@@ -4,3 +4,7 @@ dist-electron/
 .env
 .env.local
 *.log
+audio/
+public/audio/
+.DS_Store
+.netlify/

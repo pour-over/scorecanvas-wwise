@@ -100,6 +100,7 @@ export type CanvasEdge = Edge;
 export interface MusicAsset {
   id: string;
   filename: string;
+  name?: string;
   category: 'intro' | 'loop' | 'ending' | 'transition' | 'stinger' | 'layer' | 'ambient';
   duration: string;
   bpm: number;
@@ -107,6 +108,8 @@ export interface MusicAsset {
   stems: string[];
   audioFile?: string;
   wwiseImported?: boolean;
+  tags?: string[];
+  description?: string;
 }
 
 export interface GameLevel {

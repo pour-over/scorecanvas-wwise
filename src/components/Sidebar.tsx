@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
 import type { CanvasNodeType } from '../types/canvas';
+import { getAssetsByCategory, CATEGORY_CONFIG } from '../data/audio-assets';
 
 const NODE_PALETTE: { type: CanvasNodeType; label: string; desc: string }[] = [
   { type: 'musicState', label: 'Music State', desc: 'Segment / loop' },
@@ -147,6 +148,11 @@ export default function Sidebar() {
 
         <div className="mx-3 border-t border-canvas-accent" />
 
+        {/* Audio Assets */}
+        <AssetBrowser />
+
+        <div className="mx-3 border-t border-canvas-accent" />
+
         {/* Wwise Browser (placeholder) */}
         <CollapsibleSection title="Wwise Browser" defaultOpen={false}>
           <div className="text-[9px] text-canvas-muted/50 italic">
@@ -154,6 +160,146 @@ export default function Sidebar() {
           </div>
         </CollapsibleSection>
       </div>
+    </div>
+  );
+}
+
+function AssetBrowser() {
+  const grouped = getAssetsByCategory();
+  const totalCount = Object.values(grouped).reduce((sum, arr) => sum + arr.length, 0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  const handlePlay = useCallback((assetId: string, audioFile?: string) => {
+    if (!audioFile) return;
+
+    // If same track is playing, stop it
+    if (playingId === assetId) {
+      audioRef.current?.pause();
+      audioRef.current = null;
+      setPlayingId(null);
+      return;
+    }
+
+    // Stop any current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const audio = new Audio(audioFile);
+    audio.volume = 0.7;
+    audio.play().catch(() => {
+      // Silently handle autoplay restrictions
+    });
+    audio.addEventListener('ended', () => {
+      setPlayingId(null);
+      audioRef.current = null;
+    });
+    audioRef.current = audio;
+    setPlayingId(assetId);
+  }, [playingId]);
+
+  const categoryOrder = ['layer', 'loop', 'stinger', 'ambient', 'intro', 'transition', 'ending'];
+
+  return (
+    <CollapsibleSection title="Audio Assets" count={totalCount} defaultOpen={false}>
+      <div className="space-y-1">
+        {categoryOrder.map((cat) => {
+          const assets = grouped[cat];
+          if (!assets || assets.length === 0) return null;
+          const config = CATEGORY_CONFIG[cat] || { label: cat, color: 'bg-canvas-muted' };
+          return (
+            <AssetCategoryGroup
+              key={cat}
+              label={config.label}
+              color={config.color}
+              assets={assets}
+              playingId={playingId}
+              onPlay={handlePlay}
+            />
+          );
+        })}
+      </div>
+    </CollapsibleSection>
+  );
+}
+
+function AssetCategoryGroup({
+  label,
+  color,
+  assets,
+  playingId,
+  onPlay,
+}: {
+  label: string;
+  color: string;
+  assets: { id: string; name?: string; filename: string; duration: string; audioFile?: string }[];
+  playingId: string | null;
+  onPlay: (id: string, audioFile?: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div>
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center gap-1.5 py-0.5 hover:bg-canvas-accent/10 transition-colors rounded"
+      >
+        <svg
+          className={`w-1.5 h-1.5 transition-transform text-canvas-muted/60 ${open ? 'rotate-90' : ''}`}
+          viewBox="0 0 8 8"
+          fill="currentColor"
+        >
+          <path d="M2 0L8 4L2 8Z" />
+        </svg>
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${color}`} />
+        <span className="text-[9px] font-mono uppercase tracking-wider text-canvas-muted">
+          {label}
+        </span>
+        <span className="ml-auto text-[8px] font-mono text-canvas-muted/30">{assets.length}</span>
+      </button>
+      {open && (
+        <div className="ml-3 mt-0.5 space-y-px">
+          {assets.map((asset) => {
+            const isPlaying = playingId === asset.id;
+            return (
+              <div
+                key={asset.id}
+                className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] transition-colors ${
+                  isPlaying ? 'bg-canvas-accent/30' : 'hover:bg-canvas-accent/10'
+                }`}
+              >
+                <button
+                  onClick={() => onPlay(asset.id, asset.audioFile)}
+                  className={`w-3 h-3 flex items-center justify-center shrink-0 rounded-full border transition-colors ${
+                    isPlaying
+                      ? 'border-green-400/60 text-green-400'
+                      : 'border-canvas-muted/30 text-canvas-muted/50 hover:text-canvas-text hover:border-canvas-muted/60'
+                  }`}
+                  title={isPlaying ? 'Stop' : 'Play'}
+                >
+                  {isPlaying ? (
+                    <svg viewBox="0 0 8 8" className="w-1.5 h-1.5" fill="currentColor">
+                      <rect x="1" y="1" width="2" height="6" />
+                      <rect x="5" y="1" width="2" height="6" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 8 8" className="w-1.5 h-1.5" fill="currentColor">
+                      <path d="M1 0L8 4L1 8Z" />
+                    </svg>
+                  )}
+                </button>
+                <span className={`truncate ${isPlaying ? 'text-green-400' : 'text-canvas-text'}`}>
+                  {asset.name || asset.filename}
+                </span>
+                <span className="ml-auto shrink-0 text-[8px] font-mono text-canvas-muted/40">
+                  {asset.duration}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
