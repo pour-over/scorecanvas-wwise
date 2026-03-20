@@ -11,8 +11,23 @@ import { importWwiseProject, importFromWaapi, generateAssetManifest } from './se
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from project root
-dotenv.config({ path: path.join(__dirname, '..', '.env') });
+// Load .env from project root — try multiple paths
+// dotenv v17+ doesn't auto-inject into process.env, so we do it manually
+const envPaths = [
+  path.join(__dirname, '..', '.env'),       // from dist-electron/
+  path.join(__dirname, '.env'),              // same dir
+  path.join(process.cwd(), '.env'),          // cwd
+];
+for (const p of envPaths) {
+  const result = dotenv.config({ path: p });
+  if (!result.error && result.parsed) {
+    // Manually inject into process.env (dotenv v17 compat)
+    for (const [key, value] of Object.entries(result.parsed)) {
+      if (!process.env[key]) process.env[key] = value;
+    }
+    break;
+  }
+}
 
 let mainWindow: BrowserWindow | null = null;
 let waapiClient: WaapiClient | null = null;
