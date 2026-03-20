@@ -92,7 +92,32 @@ export default function ImportModal({ onClose }: Props) {
           setError(res.error || 'Import failed');
         }
       } else {
-        setError('WAAPI import requires Electron — not available in browser');
+        // Browser demo mode
+        setResult({
+          projectName: 'CTRL+ALT+DEFEAT (WAAPI Demo)',
+          nodes: [
+            { id: 'w1', name: 'Interactive Music Hierarchy', type: 'musicState', wwiseType: 'MusicSwitchContainer', wwisePath: '\\Interactive Music Hierarchy\\Main', wwiseId: 'w1', properties: {}, children: ['w2', 'w3', 'w4'] },
+            { id: 'w2', name: 'Exploration_Switch', type: 'musicState', wwiseType: 'MusicSwitchContainer', wwisePath: '\\Interactive Music Hierarchy\\Main\\Exploration', wwiseId: 'w2', parentId: 'w1', properties: {}, children: ['w5'] },
+            { id: 'w3', name: 'Combat_Playlist', type: 'musicState', wwiseType: 'MusicPlaylistContainer', wwisePath: '\\Interactive Music Hierarchy\\Main\\Combat', wwiseId: 'w3', parentId: 'w1', properties: {}, children: ['w6', 'w7'] },
+            { id: 'w4', name: 'Boss_Segment', type: 'musicState', wwiseType: 'MusicSegment', wwisePath: '\\Interactive Music Hierarchy\\Main\\Boss', wwiseId: 'w4', parentId: 'w1', properties: { Tempo: '160' }, children: [] },
+            { id: 'w5', name: 'Explore_Calm', type: 'musicState', wwiseType: 'MusicSegment', wwisePath: '\\Interactive Music Hierarchy\\Main\\Exploration\\Calm', wwiseId: 'w5', parentId: 'w2', properties: { Tempo: '85' }, children: [] },
+            { id: 'w6', name: 'Combat_Low', type: 'musicState', wwiseType: 'MusicSegment', wwisePath: '\\Interactive Music Hierarchy\\Main\\Combat\\Low', wwiseId: 'w6', parentId: 'w3', properties: { Tempo: '120' }, children: [] },
+            { id: 'w7', name: 'Combat_High', type: 'musicState', wwiseType: 'MusicSegment', wwisePath: '\\Interactive Music Hierarchy\\Main\\Combat\\High', wwiseId: 'w7', parentId: 'w3', properties: { Tempo: '140' }, children: [] },
+            { id: 'w8', name: 'ThreatLevel', type: 'parameter', wwiseType: 'GameParameter', wwisePath: '\\Game Parameters\\ThreatLevel', wwiseId: 'w8', properties: { Min: '0', Max: '100' }, children: [] },
+            { id: 'w9', name: 'Play_Combat', type: 'event', wwiseType: 'Event', wwisePath: '\\Events\\Play_Combat', wwiseId: 'w9', properties: {}, children: [] },
+          ],
+          edges: [
+            { source: 'w1', target: 'w2' },
+            { source: 'w1', target: 'w3' },
+            { source: 'w1', target: 'w4' },
+            { source: 'w2', target: 'w5' },
+            { source: 'w3', target: 'w6' },
+            { source: 'w3', target: 'w7' },
+          ],
+          requiredAssets: [],
+          hierarchy: [],
+          warnings: ['Demo mode — simulating WAAPI pull from Wwise. Connect Wwise for real data.'],
+        });
       }
     } catch (err: any) {
       setError(err.message);
@@ -220,15 +245,19 @@ export default function ImportModal({ onClose }: Props) {
               <div className={`px-3 py-2 rounded border text-[10px] ${
                 connected
                   ? 'bg-emerald-900/20 border-emerald-500/30 text-emerald-400'
-                  : 'bg-red-900/20 border-red-500/30 text-red-400'
+                  : !window.wwiseImport
+                    ? 'bg-amber-900/20 border-amber-500/30 text-amber-400'
+                    : 'bg-red-900/20 border-red-500/30 text-red-400'
               }`}>
                 {connected
                   ? 'Wwise connected — ready to pull project hierarchy'
-                  : 'Not connected to Wwise. Connect first via the sidebar.'}
+                  : !window.wwiseImport
+                    ? 'Browser demo mode — will simulate a WAAPI pull'
+                    : 'Not connected to Wwise. Connect first via the sidebar.'}
               </div>
               <button
                 onClick={handleImportWaapi}
-                disabled={importing || !connected}
+                disabled={importing || (!!window.wwiseImport && !connected)}
                 className="w-full px-3 py-2 text-[10px] font-bold text-white bg-canvas-highlight/80 border border-canvas-highlight rounded hover:bg-canvas-highlight disabled:opacity-40 transition-colors"
               >
                 {importing ? 'Querying Wwise...' : 'Pull from Live Wwise'}

@@ -1,21 +1,32 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import TopBar from './components/TopBar';
 import Sidebar from './components/Sidebar';
 import Canvas from './components/Canvas';
 import ChatPanel from './components/ChatPanel';
 import TransportBar from './components/TransportBar';
+import GuidedTour, { useShouldShowTour } from './components/GuidedTour';
 import { useCanvasStore } from './stores/canvas';
 
 export default function App() {
   const nodeCount = useCanvasStore((s) => s.nodes.length);
   const loadStarterProject = useCanvasStore((s) => s.loadStarterProject);
 
+  const shouldShowTour = useShouldShowTour();
+  const [showTour, setShowTour] = useState(false);
+
   useEffect(() => {
     if (nodeCount === 0) {
       loadStarterProject();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Show tour after starter project loads
+  useEffect(() => {
+    if (nodeCount > 0 && shouldShowTour) {
+      setShowTour(true);
+    }
+  }, [nodeCount, shouldShowTour]);
 
   return (
     <ReactFlowProvider>
@@ -38,6 +49,9 @@ export default function App() {
           <ChatPanel />
         </div>
       </div>
+
+      {/* Guided Tour Overlay */}
+      {showTour && <GuidedTour onComplete={() => setShowTour(false)} />}
     </ReactFlowProvider>
   );
 }

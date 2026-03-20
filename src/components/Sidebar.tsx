@@ -3,7 +3,7 @@ import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
 import type { CanvasNodeType } from '../types/canvas';
 import { getAssetsByCategory, CATEGORY_CONFIG } from '../data/audio-assets';
-import { GAME_NAME, GAME_SUBTITLE } from '../data/starter-project';
+import { PROJECTS, PROJECT_LEVELS } from '../data/starter-project';
 
 const NODE_PALETTE: { type: CanvasNodeType; label: string; desc: string }[] = [
   { type: 'musicState', label: 'Music State', desc: 'Segment / loop' },
@@ -51,8 +51,11 @@ function CollapsibleSection({
 }
 
 export default function Sidebar() {
-  const { addNode, nodes } = useCanvasStore();
+  const { addNode, nodes, currentProjectId, currentLevelId, loadProject, loadLevel } = useCanvasStore();
   const { connected, connect, disconnect, connecting } = useWwiseStore();
+
+  const currentProject = PROJECTS.find((p) => p.id === currentProjectId);
+  const currentLevels = currentProjectId ? (PROJECT_LEVELS[currentProjectId] || []) : [];
 
   const handleDragStart = (e: React.DragEvent, type: CanvasNodeType) => {
     e.dataTransfer.setData('application/scorecanvas-node', type);
@@ -61,10 +64,48 @@ export default function Sidebar() {
 
   return (
     <div className="w-60 bg-panel border-r border-canvas-accent flex flex-col shrink-0 overflow-hidden">
-      {/* Project Header */}
-      <div className="px-3 pt-3 pb-2">
-        <div className="text-[10px] font-bold text-canvas-text">{GAME_NAME}</div>
-        <div className="text-[8px] text-canvas-muted/60 italic">{GAME_SUBTITLE}</div>
+      {/* Project Selector */}
+      <div className="px-3 pt-3 pb-1">
+        <div className="text-[8px] font-mono uppercase tracking-widest text-canvas-muted/60 mb-1">Project</div>
+        <select
+          value={currentProjectId || ''}
+          onChange={(e) => loadProject(e.target.value)}
+          className="w-full bg-canvas-bg border border-canvas-accent rounded px-2 py-1 text-[10px] text-canvas-text font-bold focus:outline-none focus:border-canvas-highlight/50 appearance-none cursor-pointer"
+        >
+          {PROJECTS.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+        {currentProject && (
+          <div className="text-[8px] text-canvas-muted/60 italic mt-0.5">{currentProject.subtitle}</div>
+        )}
+      </div>
+
+      {/* Level Tabs */}
+      <div className="px-3 pb-2">
+        <div className="flex items-center gap-1 mb-1">
+          <span className="text-[8px] font-mono uppercase tracking-widest text-canvas-muted/60">Levels</span>
+          <span className="text-[8px] font-mono bg-canvas-accent/40 text-canvas-muted rounded px-1">{currentLevels.length}</span>
+        </div>
+        <div className="flex flex-col gap-0.5">
+          {currentLevels.map((level) => {
+            const isActive = level.id === currentLevelId;
+            return (
+              <button
+                key={level.id}
+                onClick={() => loadLevel(level.id)}
+                className={`w-full text-left px-2 py-1 rounded text-[9px] transition-colors ${
+                  isActive
+                    ? 'bg-canvas-highlight/20 text-canvas-highlight border border-canvas-highlight/40'
+                    : 'bg-canvas-bg/50 text-canvas-muted hover:bg-canvas-accent/30 hover:text-canvas-text border border-transparent'
+                }`}
+              >
+                <div className="font-medium truncate">{level.name}</div>
+                <div className="text-[7px] opacity-60 truncate">{level.subtitle}</div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <div className="mx-3 border-t border-canvas-accent" />
