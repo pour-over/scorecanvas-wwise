@@ -64,7 +64,7 @@ export const starterNodes: CanvasNode[] = [
       intensity: 20,
       looping: true,
       stems: ['ambient_pad', 'texture'],
-      asset: 'Adrift 01',
+      asset: 'Ruins',
       status: 'wip',
       directorNote: 'Floating through the server room of eternity',
     } as MusicStateData,
@@ -388,7 +388,7 @@ export const starterEdges: CanvasEdge[] = [
 // ─── Level Assets (references from audioAssets) ───────────────────
 
 const levelAssetIds = [
-  'aa-menuselect-19', 'aa-adrift01-21', 'aa-ghost-25', 'aa-stageone-14',
+  'aa-menuselect-19', 'aa-ruins-13', 'aa-ghost-25', 'aa-stageone-14',
   'aa-pwn-11', 'aa-inevitable-05', 'aa-levelup-18', 'aa-memory-06',
   'aa-coldlogic-02', 'aa-novaflare-07', 'aa-badguys-24', 'aa-sweep-26',
 ];
