@@ -343,34 +343,36 @@ export async function importFromWaapi(
     'MusicTrack',
     'MusicSwitchContainer',
     'MusicPlaylistContainer',
-    'MusicRanSeqContainer',
   ];
 
   for (const wwiseType of musicTypes) {
-    const result = await waapiCall(
-      'ak.wwise.core.object.get',
-      { waql: `$ from type ${wwiseType}` },
-      { return: ['id', 'name', 'type', 'path', 'parent.id', 'parent.name'] }
-    );
+    try {
+      const result = await waapiCall(
+        'ak.wwise.core.object.get',
+        { waql: `$ from type ${wwiseType}` },
+        { return: ['id', 'name', 'type', 'path', 'parent.id', 'parent.name'] }
+      );
 
-    const objects = result?.return || [];
-    for (const obj of objects) {
-      const canvasType = wwiseType === 'MusicTransition' ? 'transition' : 'musicState';
-      nodes.push({
-        id: obj.id,
-        name: obj.name,
-        type: canvasType,
-        wwiseType,
-        wwisePath: obj.path,
-        wwiseId: obj.id,
-        parentId: obj['parent.id'],
-        properties: {},
-        children: [],
-      });
+      const objects = result?.return || [];
+      for (const obj of objects) {
+        nodes.push({
+          id: obj.id,
+          name: obj.name,
+          type: 'musicState',
+          wwiseType: obj.type || wwiseType,
+          wwisePath: obj.path,
+          wwiseId: obj.id,
+          parentId: obj['parent.id'],
+          properties: {},
+          children: [],
+        });
 
-      if (obj['parent.id']) {
-        edges.push({ source: obj['parent.id'], target: obj.id });
+        if (obj['parent.id']) {
+          edges.push({ source: obj['parent.id'], target: obj.id });
+        }
       }
+    } catch (err: any) {
+      warnings.push(`Failed to query ${wwiseType}: ${err.message}`);
     }
   }
 
@@ -382,52 +384,65 @@ export async function importFromWaapi(
   ];
 
   for (const { wwise: wwiseType, canvas: canvasType } of syncTypes) {
-    const result = await waapiCall(
+    try {
+      const result = await waapiCall(
+        'ak.wwise.core.object.get',
+        { waql: `$ from type ${wwiseType}` },
+        { return: ['id', 'name', 'type', 'path'] }
+      );
+
+      for (const obj of (result?.return || [])) {
+        nodes.push({
+          id: obj.id,
+          name: obj.name,
+          type: canvasType,
+          wwiseType: obj.type || wwiseType,
+          wwisePath: obj.path,
+          wwiseId: obj.id,
+          properties: {},
+          children: [],
+        });
+      }
+    } catch (err: any) {
+      warnings.push(`Failed to query ${wwiseType}: ${err.message}`);
+    }
+  }
+
+  // Query Events
+  try {
+    const eventsResult = await waapiCall(
       'ak.wwise.core.object.get',
-      { waql: `$ from type ${wwiseType}` },
+      { waql: `$ from type Event` },
       { return: ['id', 'name', 'type', 'path'] }
     );
 
-    for (const obj of (result?.return || [])) {
+    for (const obj of (eventsResult?.return || [])) {
       nodes.push({
         id: obj.id,
         name: obj.name,
-        type: canvasType,
-        wwiseType,
+        type: 'event',
+        wwiseType: 'Event',
         wwisePath: obj.path,
         wwiseId: obj.id,
         properties: {},
         children: [],
       });
     }
-  }
-
-  // Query Events
-  const eventsResult = await waapiCall(
-    'ak.wwise.core.object.get',
-    { waql: `$ from type Event` },
-    { return: ['id', 'name', 'type', 'path'] }
-  );
-
-  for (const obj of (eventsResult?.return || [])) {
-    nodes.push({
-      id: obj.id,
-      name: obj.name,
-      type: 'event',
-      wwiseType: 'Event',
-      wwisePath: obj.path,
-      wwiseId: obj.id,
-      properties: {},
-      children: [],
-    });
+  } catch (err: any) {
+    warnings.push(`Failed to query Events: ${err.message}`);
   }
 
   // Query audio source files for asset manifest
-  const sourcesResult = await waapiCall(
-    'ak.wwise.core.object.get',
-    { waql: `$ from type AudioFileSource` },
-    { return: ['id', 'name', 'path', 'sound:originalWavFilePath'] }
-  );
+  let sourcesResult: any = { return: [] };
+  try {
+    sourcesResult = await waapiCall(
+      'ak.wwise.core.object.get',
+      { waql: `$ from type AudioFileSource` },
+      { return: ['id', 'name', 'path', 'sound:originalWavFilePath'] }
+    );
+  } catch (err: any) {
+    warnings.push(`Failed to query AudioFileSource: ${err.message}`);
+  }
 
   for (const obj of (sourcesResult?.return || [])) {
     const wavPath = obj['sound:originalWavFilePath'] || '';
