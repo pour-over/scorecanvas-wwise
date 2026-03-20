@@ -46,12 +46,28 @@ export default function TopBar() {
       <div className="w-px h-5 bg-canvas-accent" />
 
       {/* View Mode Toggle */}
-      <button
-        onClick={toggleViewMode}
-        className="px-2.5 py-1 text-[11px] font-semibold rounded border transition-colors bg-canvas-accent/60 text-canvas-text border-canvas-accent hover:bg-canvas-accent"
-      >
-        {viewMode === 'detailed' ? 'Detailed' : 'Simple'}
-      </button>
+      <div className="flex items-center rounded-md border border-canvas-accent overflow-hidden">
+        <button
+          onClick={() => { if (viewMode !== 'detailed') toggleViewMode(); }}
+          className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+            viewMode === 'detailed'
+              ? 'bg-canvas-highlight/20 text-canvas-highlight border-r border-canvas-accent'
+              : 'bg-canvas-accent/30 text-canvas-muted border-r border-canvas-accent hover:bg-canvas-accent/50'
+          }`}
+        >
+          Detailed
+        </button>
+        <button
+          onClick={() => { if (viewMode !== 'simple') toggleViewMode(); }}
+          className={`px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+            viewMode === 'simple'
+              ? 'bg-canvas-highlight/20 text-canvas-highlight'
+              : 'bg-canvas-accent/30 text-canvas-muted hover:bg-canvas-accent/50'
+          }`}
+        >
+          Simple
+        </button>
+      </div>
 
       {/* Import Button */}
       <button

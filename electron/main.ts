@@ -1,11 +1,15 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
-import { WaapiClient } from './waapi/client';
-import { streamChat, type ChatMessageParam } from './services/claude';
-import { submitCover, getCoverStatus, generateCover, type CoverRequest } from './services/kie';
-import { analyzeAudio } from './services/audio-analysis';
-import { importWwiseProject, importFromWaapi, generateAssetManifest } from './services/wwise-import';
+import { WaapiClient } from './waapi/client.js';
+import { streamChat, type ChatMessageParam } from './services/claude.js';
+import { submitCover, getCoverStatus, generateCover, type CoverRequest } from './services/kie.js';
+import { analyzeAudio } from './services/audio-analysis.js';
+import { importWwiseProject, importFromWaapi, generateAssetManifest } from './services/wwise-import.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load .env from project root
 dotenv.config({ path: path.join(__dirname, '..', '.env') });

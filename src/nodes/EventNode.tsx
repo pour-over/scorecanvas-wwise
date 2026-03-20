@@ -44,18 +44,20 @@ export default function EventNode({ id, data, selected }: NodeProps) {
           <span className="text-sm font-semibold text-canvas-text truncate">{d.label}</span>
         </div>
 
-        <div className="mt-1">
-          <span
-            className="inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border"
-            style={{
-              background: `${color}20`,
-              color: color,
-              borderColor: `${color}50`,
-            }}
-          >
-            {d.eventType.replace('_', ' ')}
-          </span>
-        </div>
+        {isDetailed && (
+          <div className="mt-1">
+            <span
+              className="inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded border"
+              style={{
+                background: `${color}20`,
+                color: color,
+                borderColor: `${color}50`,
+              }}
+            >
+              {d.eventType.replace('_', ' ')}
+            </span>
+          </div>
+        )}
 
         {isDetailed && (
           <div className="mt-2 space-y-1 text-[10px] font-mono">

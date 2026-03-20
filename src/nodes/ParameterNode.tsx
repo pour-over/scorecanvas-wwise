@@ -36,7 +36,9 @@ export default function ParameterNode({ id, data, selected }: NodeProps) {
           <span className="text-sm font-semibold text-canvas-text truncate">{d.label}</span>
         </div>
 
-        <div className="mt-1 text-[9px] font-mono text-purple-400/80">RTPC</div>
+        {isDetailed && (
+          <div className="mt-1 text-[9px] font-mono text-purple-400/80">RTPC</div>
+        )}
 
         {/* Value Bar */}
         <div className="mt-1.5 h-[2px] bg-canvas-accent/30 rounded-full overflow-hidden">

@@ -1,43 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useCanvasStore } from '../stores/canvas';
 import { useAudioStore } from '../stores/audio';
+import { audioAssets } from '../data/audio-assets';
+import type { MusicStateData } from '../types/canvas';
 
-// Journey cat sprite (8x8, 2 frames)
+// Shadow — Siamese cat sprite (8x8, 2 frames)
 const SPRITE_FRAMES = [
   // run1
   [
-    ['', 'w', '', '', 'w', '', '', ''],
-    ['', 'w', 'w', 'w', 'w', '', '', ''],
-    ['', 'w', 'g', 'w', 'g', '', '', ''],
-    ['', '', 'w', 'w', 'w', '', '', ''],
-    ['', 'r', 'w', 'w', 'r', 'r', 'r', ''],
-    ['', '', 'w', 'w', '', '', '', 'r'],
-    ['', '', 'w', '', '', '', '', ''],
-    ['', 'w', '', 'w', '', '', '', ''],
+    ['', '', 'b', '', '', 'b', '', ''],
+    ['', 'b', 'c', 'c', 'c', 'b', '', ''],
+    ['', 'b', 'B', 'c', 'B', 'b', '', ''],
+    ['', '', 'b', 'b', 'b', '', '', ''],
+    ['', 'c', 'c', 'c', 'c', 'c', '', ''],
+    ['', 'c', 'c', 'c', 'c', 'c', 'b', ''],
+    ['', 'b', '', '', '', 'b', '', 'b'],
+    ['b', '', '', '', 'b', '', '', ''],
   ],
-  // run2
+  // run2 (stride)
   [
-    ['', 'w', '', '', 'w', '', '', ''],
-    ['', 'w', 'w', 'w', 'w', '', '', ''],
-    ['', 'w', 'g', 'w', 'g', '', '', ''],
-    ['', '', 'w', 'w', 'w', '', '', ''],
-    ['', 'r', 'w', 'w', 'r', 'r', '', ''],
-    ['', '', 'w', 'w', '', '', 'r', ''],
-    ['', '', 'w', '', '', '', '', 'r'],
-    ['', '', 'w', 'w', '', '', '', ''],
+    ['', '', 'b', '', '', 'b', '', ''],
+    ['', 'b', 'c', 'c', 'c', 'b', '', ''],
+    ['', 'b', 'B', 'c', 'B', 'b', '', ''],
+    ['', '', 'b', 'b', 'b', '', '', ''],
+    ['', 'c', 'c', 'c', 'c', 'c', '', ''],
+    ['', 'c', 'c', 'c', 'c', 'c', '', 'b'],
+    ['', '', 'b', '', 'b', '', 'b', ''],
+    ['', 'b', '', '', '', 'b', '', ''],
   ],
 ];
 
 const COLOR_MAP: Record<string, string> = {
-  r: '#e94560',
-  w: '#e0d6c8',
-  g: '#4ade80',
+  c: '#f5e6d3', // cream body
+  b: '#5c3d2e', // dark chocolate points
+  B: '#60a5fa', // blue eyes
 };
 
 function PixelSprite({ frame }: { frame: string[][] }) {
   const px = 3;
   return (
-    <div style={{ imageRendering: 'pixelated', filter: 'drop-shadow(0 0 4px rgba(233,69,96,0.88))' }}>
+    <div style={{ imageRendering: 'pixelated', filter: 'drop-shadow(0 0 4px rgba(96,165,250,0.7))' }}>
       {frame.map((row, y) => (
         <div key={y} style={{ display: 'flex', height: px }}>
           {row.map((cell, x) => (
@@ -56,41 +58,193 @@ function PixelSprite({ frame }: { frame: string[][] }) {
   );
 }
 
+/** Look up an audio asset by name (the node's `asset` field matches audioAssets `name`) */
+function findAudioFile(assetName: string | undefined): string | undefined {
+  if (!assetName) return undefined;
+  const match = audioAssets.find(
+    (a) => a.name?.toLowerCase() === assetName.toLowerCase()
+  );
+  return match?.audioFile;
+}
+
 export default function TransportBar() {
-  const { nodes, playingNodeId, setPlayingNodeId } = useCanvasStore();
+  const { nodes, edges, playingNodeId, setPlayingNodeId } = useCanvasStore();
   const { volume, setVolume, playbackMode, setPlaybackMode } = useAudioStore();
   const [minimized, setMinimized] = useState(false);
   const [spriteFrame, setSpriteFrame] = useState(0);
   const [progress, setProgress] = useState(0);
   const [showSprite, setShowSprite] = useState(true);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const rafRef = useRef<number>(0);
   const isPlaying = playingNodeId !== null;
 
-  // Animate sprite
+  // Get all MusicState nodes in order
+  const musicNodes = nodes.filter((n) => n.type === 'musicState');
+
+  // Find next connected MusicState node via edges
+  const findNextMusicNode = useCallback(
+    (currentId: string): string | null => {
+      // Find edges from the current node
+      const outEdges = edges.filter((e) => e.source === currentId);
+      for (const edge of outEdges) {
+        // Check if the target is a MusicState node
+        const targetNode = nodes.find((n) => n.id === edge.target);
+        if (targetNode && targetNode.type === 'musicState') {
+          return targetNode.id;
+        }
+        // If target is a transition node, follow its outgoing edges
+        if (targetNode && targetNode.type === 'transition') {
+          const transOutEdges = edges.filter((e2) => e2.source === targetNode.id);
+          for (const te of transOutEdges) {
+            const nextNode = nodes.find((n) => n.id === te.target);
+            if (nextNode && nextNode.type === 'musicState') {
+              return nextNode.id;
+            }
+          }
+        }
+      }
+      // Fallback in Full Score mode: go to next musicState node in order
+      if (playbackMode === 'full') {
+        const idx = musicNodes.findIndex((n) => n.id === currentId);
+        if (idx >= 0 && idx < musicNodes.length - 1) {
+          return musicNodes[idx + 1].id;
+        }
+      }
+      return null;
+    },
+    [edges, nodes, musicNodes, playbackMode]
+  );
+
+  // Animate sprite frames
   useEffect(() => {
     if (!isPlaying) return;
     const iv = setInterval(() => setSpriteFrame((f) => (f + 1) % 2), 220);
     return () => clearInterval(iv);
   }, [isPlaying]);
 
-  // Simulate progress
+  // Update audio volume in real-time
   useEffect(() => {
-    if (!isPlaying) { setProgress(0); return; }
-    const iv = setInterval(() => {
-      setProgress((p) => {
-        if (p >= 100) { setPlayingNodeId(null); return 0; }
-        return p + 0.5;
-      });
-    }, 50);
-    return () => clearInterval(iv);
-  }, [isPlaying, setPlayingNodeId]);
+    if (audioRef.current) {
+      audioRef.current.volume = volume;
+    }
+  }, [volume]);
+
+  // Track real audio progress via requestAnimationFrame
+  const updateProgress = useCallback(() => {
+    const audio = audioRef.current;
+    if (audio && !audio.paused && audio.duration && isFinite(audio.duration)) {
+      const pct = (audio.currentTime / audio.duration) * 100;
+      setProgress(pct);
+      setCurrentTime(audio.currentTime);
+      setDuration(audio.duration);
+    }
+    rafRef.current = requestAnimationFrame(updateProgress);
+  }, []);
+
+  // Start/stop progress tracking
+  useEffect(() => {
+    if (isPlaying) {
+      rafRef.current = requestAnimationFrame(updateProgress);
+    }
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [isPlaying, updateProgress]);
+
+  // Play audio when playingNodeId changes
+  useEffect(() => {
+    // Stop any existing audio
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute('src');
+      audioRef.current.load();
+      audioRef.current = null;
+    }
+
+    if (!playingNodeId) {
+      setProgress(0);
+      setCurrentTime(0);
+      setDuration(0);
+      return;
+    }
+
+    const node = nodes.find((n) => n.id === playingNodeId);
+    if (!node) return;
+
+    const nodeData = node.data as unknown as MusicStateData;
+    const audioFile = findAudioFile(nodeData.asset);
+    if (!audioFile) {
+      // No audio file found, skip to next or stop
+      const nextId = findNextMusicNode(playingNodeId);
+      if (nextId && playbackMode === 'full') {
+        // Small delay to avoid infinite loops for nodes with no audio
+        const timeout = setTimeout(() => setPlayingNodeId(nextId), 200);
+        return () => clearTimeout(timeout);
+      } else {
+        setPlayingNodeId(null);
+      }
+      return;
+    }
+
+    const audio = new Audio(audioFile);
+    audio.volume = volume;
+    audioRef.current = audio;
+
+    audio.addEventListener('ended', () => {
+      const nextId = findNextMusicNode(playingNodeId);
+      if (nextId && playbackMode === 'full') {
+        setPlayingNodeId(nextId);
+      } else {
+        setPlayingNodeId(null);
+        setProgress(0);
+        setCurrentTime(0);
+        setDuration(0);
+      }
+    });
+
+    audio.addEventListener('error', () => {
+      // Audio failed to load, advance or stop
+      const nextId = findNextMusicNode(playingNodeId);
+      if (nextId && playbackMode === 'full') {
+        setPlayingNodeId(nextId);
+      } else {
+        setPlayingNodeId(null);
+      }
+    });
+
+    audio.play().catch(() => {
+      // Autoplay blocked or file not found
+      setPlayingNodeId(null);
+    });
+
+    return () => {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playingNodeId]);
 
   const handlePlayStop = () => {
     if (isPlaying) {
       setPlayingNodeId(null);
-    } else if (nodes.length > 0) {
-      setPlayingNodeId(nodes[0].id);
+    } else if (musicNodes.length > 0) {
+      setPlayingNodeId(musicNodes[0].id);
     }
   };
+
+  const formatTime = (secs: number): string => {
+    if (!isFinite(secs) || secs < 0) return '0:00';
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const currentNodeLabel = isPlaying
+    ? (nodes.find((n) => n.id === playingNodeId)?.data as unknown as MusicStateData)?.label || 'Playing'
+    : 'Stopped';
 
   if (minimized) {
     return (
@@ -100,7 +254,7 @@ export default function TransportBar() {
             {isPlaying ? '⏹' : '▶'}
           </button>
           <span className="text-[10px] text-canvas-text font-mono">
-            {isPlaying ? 'Playing...' : 'Stopped'}
+            {isPlaying ? currentNodeLabel : 'Stopped'}
           </span>
           <button
             onClick={() => setMinimized(false)}
@@ -134,10 +288,13 @@ export default function TransportBar() {
           <div className="flex items-center gap-1.5 min-w-0">
             {isPlaying && <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />}
             <span className="text-[11px] text-canvas-text font-mono truncate">
-              {isPlaying
-                ? (nodes.find((n) => n.id === playingNodeId)?.data as any)?.label || 'Playing'
-                : 'Stopped'}
+              {currentNodeLabel}
             </span>
+            {isPlaying && duration > 0 && (
+              <span className="text-[9px] text-canvas-muted font-mono shrink-0">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </span>
+            )}
           </div>
 
           {/* Volume */}
@@ -177,7 +334,7 @@ export default function TransportBar() {
             onClick={() => setShowSprite(!showSprite)}
             className="text-[11px] text-canvas-muted hover:text-canvas-text transition-colors"
           >
-            🎮
+            🐱
           </button>
 
           {/* Minimize */}
@@ -202,8 +359,8 @@ export default function TransportBar() {
             />
 
             {/* Node markers */}
-            {nodes.map((node, i) => {
-              const pct = nodes.length > 1 ? (i / (nodes.length - 1)) * 92 + 4 : 50;
+            {musicNodes.map((node, i) => {
+              const pct = musicNodes.length > 1 ? (i / (musicNodes.length - 1)) * 92 + 4 : 50;
               const isCurrent = node.id === playingNodeId;
               return (
                 <div
@@ -221,7 +378,7 @@ export default function TransportBar() {
               );
             })}
 
-            {/* Sprite character */}
+            {/* Sprite character — Shadow */}
             {isPlaying && (
               <div
                 className="absolute transition-all duration-200"
@@ -232,6 +389,16 @@ export default function TransportBar() {
                 }}
               >
                 <PixelSprite frame={SPRITE_FRAMES[spriteFrame]} />
+              </div>
+            )}
+
+            {/* Shadow label */}
+            {showSprite && (
+              <div
+                className="absolute text-canvas-muted/50 font-mono select-none"
+                style={{ fontSize: 7, right: 6, top: 2 }}
+              >
+                Shadow
               </div>
             )}
           </div>

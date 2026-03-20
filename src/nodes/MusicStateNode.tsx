@@ -6,10 +6,19 @@ import AIVariationModal from '../components/AIVariationModal';
 
 export default function MusicStateNode({ id, data, selected }: NodeProps) {
   const d = data as unknown as MusicStateData;
-  const { viewMode, playingNodeId } = useCanvasStore();
+  const { viewMode, playingNodeId, setPlayingNodeId } = useCanvasStore();
   const isPlaying = playingNodeId === id;
   const isDetailed = viewMode === 'detailed';
   const [showVariation, setShowVariation] = useState(false);
+
+  const handlePlay = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isPlaying) {
+      setPlayingNodeId(null);
+    } else {
+      setPlayingNodeId(id);
+    }
+  };
 
   const intensityColor =
     d.intensity > 75 ? '#e94560' : d.intensity > 45 ? '#f59e0b' : '#4ecdc4';
@@ -40,6 +49,19 @@ export default function MusicStateNode({ id, data, selected }: NodeProps) {
             <circle cx="18" cy="16" r="3" />
           </svg>
           <span className="text-sm font-semibold text-canvas-text truncate">{d.label}</span>
+          {isDetailed && (
+            <button
+              onClick={handlePlay}
+              className={`ml-auto w-5 h-5 rounded flex items-center justify-center text-[10px] transition-colors ${
+                isPlaying
+                  ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                  : 'bg-green-900/30 text-green-400 hover:bg-green-900/50'
+              }`}
+              title={isPlaying ? 'Stop' : 'Play'}
+            >
+              {isPlaying ? '⏹' : '▶'}
+            </button>
+          )}
         </div>
 
         {/* Intensity Bar */}
@@ -82,7 +104,7 @@ export default function MusicStateNode({ id, data, selected }: NodeProps) {
         )}
 
         {/* Status Badge */}
-        {d.status && (
+        {d.status && isDetailed && (
           <div className="mt-1.5">
             <StatusBadge status={d.status} />
           </div>
