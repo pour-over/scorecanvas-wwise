@@ -3,6 +3,7 @@ import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
 import type { CanvasNodeType } from '../types/canvas';
 import { getAssetsByCategory, CATEGORY_CONFIG } from '../data/audio-assets';
+import { GAME_NAME, GAME_SUBTITLE } from '../data/starter-project';
 
 const NODE_PALETTE: { type: CanvasNodeType; label: string; desc: string }[] = [
   { type: 'musicState', label: 'Music State', desc: 'Segment / loop' },
@@ -62,8 +63,8 @@ export default function Sidebar() {
     <div className="w-60 bg-panel border-r border-canvas-accent flex flex-col shrink-0 overflow-hidden">
       {/* Project Header */}
       <div className="px-3 pt-3 pb-2">
-        <div className="text-[10px] font-bold text-canvas-text">ScoreCanvas Wwise</div>
-        <div className="text-[8px] text-canvas-muted/60 italic">Adaptive Music Workstation</div>
+        <div className="text-[10px] font-bold text-canvas-text">{GAME_NAME}</div>
+        <div className="text-[8px] text-canvas-muted/60 italic">{GAME_SUBTITLE}</div>
       </div>
 
       <div className="mx-3 border-t border-canvas-accent" />
