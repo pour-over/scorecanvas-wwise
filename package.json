@@ -1,0 +1,42 @@
+{
+  "name": "scorecanvas-wwise",
+  "version": "0.1.0",
+  "description": "ScoreCanvas Wwise — The Ultimate Conversational Adaptive Music Workstation",
+  "type": "module",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build && tsc -p tsconfig.electron.json",
+    "preview": "vite preview",
+    "electron:dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "electron:build": "npm run build && electron-builder"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "@xyflow/react": "^12.6.0",
+    "dotenv": "^17.3.1",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "uuid": "^11.1.0",
+    "ws": "^8.18.0",
+    "xml2js": "^0.6.2",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/uuid": "^10.0.0",
+    "@types/ws": "^8.5.0",
+    "@types/xml2js": "^0.4.14",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.0",
+    "concurrently": "^9.1.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0",
+    "postcss": "^8.4.0",
+    "tailwindcss": "^3.4.0",
+    "typescript": "^5.6.0",
+    "vite": "^5.4.0",
+    "wait-on": "^8.0.0"
+  }
+}
