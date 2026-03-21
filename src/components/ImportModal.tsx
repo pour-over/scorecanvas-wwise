@@ -1,6 +1,8 @@
 import { useState } from 'react';
+import { v4 as uuid } from 'uuid';
 import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
+import type { GameProject, GameLevel } from '../types/canvas';
 
 interface ImportResult {
   projectName: string;
@@ -26,7 +28,7 @@ export default function ImportModal({ onClose }: Props) {
   const [manifest, setManifest] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { connected } = useWwiseStore();
-  const { addNode, connectNodes } = useCanvasStore();
+  const { addNode, connectNodes, setNodes, setEdges, addProject, loadProject } = useCanvasStore();
 
   const handleImportXml = async () => {
     if (!projectPath.trim()) {
@@ -129,6 +131,10 @@ export default function ImportModal({ onClose }: Props) {
   const handlePlaceOnCanvas = () => {
     if (!result) return;
 
+    // Clear canvas first for a fresh import
+    setNodes([]);
+    setEdges([]);
+
     // BFS layout — group by depth, spread across columns
     const idMap = new Map<string, string>(); // wwiseId -> canvasNodeId
     const roots = result.nodes.filter(
@@ -175,6 +181,38 @@ export default function ImportModal({ onClose }: Props) {
         connectNodes(srcId, tgtId);
       }
     }
+
+    // Create a new project named after the Wwise project
+    const projectId = `wwise-${uuid().slice(0, 8)}`;
+    const levelId = `wwise-level-${uuid().slice(0, 8)}`;
+    const store = useCanvasStore.getState();
+
+    const newLevel: GameLevel = {
+      id: levelId,
+      name: result.projectName,
+      subtitle: `Imported from Wwise — ${result.nodes.length} objects`,
+      region: 'Wwise',
+      nodes: store.nodes,
+      edges: store.edges,
+      assets: [],
+    };
+
+    const newProject: GameProject = {
+      id: projectId,
+      name: result.projectName,
+      subtitle: `Wwise Project — ${new Date().toLocaleDateString()}`,
+      wwiseProjectPath: result.projectName,
+      levels: [newLevel],
+    };
+
+    addProject(newProject);
+    // Switch to the new project
+    useCanvasStore.setState({
+      currentProjectId: projectId,
+      currentLevelId: levelId,
+      selectedProjectId: projectId,
+      selectedLevelId: levelId,
+    });
 
     onClose();
   };

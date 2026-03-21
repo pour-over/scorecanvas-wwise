@@ -5,12 +5,15 @@ import Sidebar from './components/Sidebar';
 import Canvas from './components/Canvas';
 import ChatPanel from './components/ChatPanel';
 import TransportBar from './components/TransportBar';
+import VersionHistory from './components/VersionHistory';
 import GuidedTour, { useShouldShowTour } from './components/GuidedTour';
 import { useCanvasStore } from './stores/canvas';
+import { useAutoSave } from './hooks/useAutoSave';
 
 export default function App() {
   const nodeCount = useCanvasStore((s) => s.nodes.length);
   const loadStarterProject = useCanvasStore((s) => s.loadStarterProject);
+  useAutoSave();
 
   const shouldShowTour = useShouldShowTour();
   const [showTour, setShowTour] = useState(false);
@@ -48,6 +51,9 @@ export default function App() {
           {/* Right Chat Panel */}
           <ChatPanel />
         </div>
+
+        {/* Version History */}
+        <VersionHistory />
       </div>
 
       {/* Guided Tour Overlay */}

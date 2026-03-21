@@ -47,6 +47,15 @@ contextBridge.exposeInMainWorld('wwiseImport', {
   getManifest: (projectPath: string) => ipcRenderer.invoke('import:manifest', projectPath),
 });
 
+// Canvas → Wwise Push/Sync
+contextBridge.exposeInMainWorld('wwiseSync', {
+  pushNode: (node: any) => ipcRenderer.invoke('push:node', node),
+  pushAll: (nodes: any[], edges: any[]) => ipcRenderer.invoke('push:all', nodes, edges),
+  onProgress: (callback: (progress: { current: number; total: number; label: string }) => void) =>
+    ipcRenderer.on('push:progress', (_e, progress) => callback(progress)),
+  removeProgressListeners: () => ipcRenderer.removeAllListeners('push:progress'),
+});
+
 // Platform info
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,

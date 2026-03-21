@@ -5,6 +5,17 @@ import type { CanvasNodeType } from '../types/canvas';
 import { getAssetsByCategory, CATEGORY_CONFIG } from '../data/audio-assets';
 import { PROJECTS, PROJECT_LEVELS } from '../data/starter-project';
 
+declare global {
+  interface Window {
+    wwiseSync?: {
+      pushAll: (nodes: any[], edges: any[]) => Promise<any>;
+      pushNode: (node: any) => Promise<any>;
+      onProgress: (cb: (p: { current: number; total: number; label: string }) => void) => void;
+      removeProgressListeners: () => void;
+    };
+  }
+}
+
 const NODE_PALETTE: { type: CanvasNodeType; label: string; desc: string }[] = [
   { type: 'musicState', label: 'Music State', desc: 'Segment / loop' },
   { type: 'transition', label: 'Transition', desc: 'Crossfade / cut' },
@@ -54,8 +65,14 @@ export default function Sidebar() {
   const { addNode, nodes, currentProjectId, currentLevelId, loadProject, loadLevel } = useCanvasStore();
   const { connected, connect, disconnect, connecting } = useWwiseStore();
 
-  const currentProject = PROJECTS.find((p) => p.id === currentProjectId);
-  const currentLevels = currentProjectId ? (PROJECT_LEVELS[currentProjectId] || []) : [];
+  const { projects } = useCanvasStore();
+  // Merge starter projects with dynamically-added projects (imported from Wwise etc.)
+  const allProjects = [...PROJECTS, ...projects.filter((p) => !PROJECTS.some((sp) => sp.id === p.id))];
+  const currentProject = allProjects.find((p) => p.id === currentProjectId);
+  // For dynamic projects, levels are embedded in the project; for starters, use PROJECT_LEVELS
+  const currentLevels = currentProjectId
+    ? (PROJECT_LEVELS[currentProjectId] || currentProject?.levels || [])
+    : [];
 
   const handleDragStart = (e: React.DragEvent, type: CanvasNodeType) => {
     e.dataTransfer.setData('application/scorecanvas-node', type);
@@ -72,7 +89,7 @@ export default function Sidebar() {
           onChange={(e) => loadProject(e.target.value)}
           className="w-full bg-canvas-bg border border-canvas-accent rounded px-2 py-1 text-[10px] text-canvas-text font-bold focus:outline-none focus:border-canvas-highlight/50 appearance-none cursor-pointer"
         >
-          {PROJECTS.map((p) => (
+          {allProjects.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>

@@ -7,6 +7,7 @@ import { streamChat, type ChatMessageParam } from './services/claude.js';
 import { submitCover, getCoverStatus, generateCover, type CoverRequest } from './services/kie.js';
 import { analyzeAudio } from './services/audio-analysis.js';
 import { importWwiseProject, importFromWaapi, generateAssetManifest } from './services/wwise-import.js';
+import { WwiseSyncEngine } from './waapi/sync-engine.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,8 +48,15 @@ function createWindow() {
     },
   });
 
-  if (process.env.NODE_ENV === 'development' || process.env.VITE_DEV_SERVER_URL) {
-    mainWindow.loadURL('http://localhost:5173');
+  // In dev mode: load from Vite. Detect by checking if Vite is running on 5173.
+  // The electron:dev script runs Vite concurrently, so if we got here via that script, use Vite.
+  const devUrl = process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173';
+  const isDev = process.env.NODE_ENV === 'development'
+    || process.env.VITE_DEV_SERVER_URL
+    || !app.isPackaged; // !isPackaged = running from source = dev mode
+
+  if (isDev) {
+    mainWindow.loadURL(devUrl);
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
@@ -104,18 +112,24 @@ ipcMain.handle('waapi:status', () => {
 // --- Claude Chat IPC ---
 ipcMain.handle('claude:stream', async (event, messages: ChatMessageParam[]) => {
   try {
+    let doneText = '';
     await streamChat(
       messages,
       (chunk) => {
         mainWindow?.webContents.send('claude:chunk', chunk);
       },
       (fullText) => {
-        mainWindow?.webContents.send('claude:done', fullText);
+        doneText = fullText;
       },
       (error) => {
         mainWindow?.webContents.send('claude:error', error);
       }
     );
+    // Send done event AFTER streamChat fully resolves, then return
+    if (doneText) {
+      console.log('[main] Sending claude:done to renderer, length:', doneText.length);
+      mainWindow?.webContents.send('claude:done', doneText);
+    }
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -191,6 +205,35 @@ ipcMain.handle('import:manifest', async (_event, projectPath: string) => {
     const result = await importWwiseProject(projectPath);
     const manifest = generateAssetManifest(result);
     return { success: true, data: { manifest, result } };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// --- Push to Wwise (Canvas → Wwise Sync) ---
+ipcMain.handle('push:node', async (_event, node: any) => {
+  if (!waapiClient?.isConnected) {
+    return { success: false, error: 'Not connected to Wwise' };
+  }
+  try {
+    const sync = new WwiseSyncEngine(waapiClient);
+    const result = await sync.pushNode(node);
+    return { success: result.success, data: result };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('push:all', async (_event, nodes: any[], edges: any[]) => {
+  if (!waapiClient?.isConnected) {
+    return { success: false, error: 'Not connected to Wwise' };
+  }
+  try {
+    const sync = new WwiseSyncEngine(waapiClient);
+    const result = await sync.pushAll(nodes, edges, (current, total, label) => {
+      mainWindow?.webContents.send('push:progress', { current, total, label });
+    });
+    return { success: true, data: result };
   } catch (err: any) {
     return { success: false, error: err.message };
   }

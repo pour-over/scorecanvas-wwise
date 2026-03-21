@@ -1,12 +1,63 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
 import ImportModal from './ImportModal';
+
+declare global {
+  interface Window {
+    wwiseSync?: {
+      pushAll: (nodes: any[], edges: any[]) => Promise<any>;
+      pushNode: (node: any) => Promise<any>;
+      onProgress: (cb: (p: { current: number; total: number; label: string }) => void) => void;
+      removeProgressListeners: () => void;
+    };
+  }
+}
 
 export default function TopBar() {
   const { nodes, edges, viewMode, toggleViewMode } = useCanvasStore();
   const { connected, projectInfo } = useWwiseStore();
   const [showImport, setShowImport] = useState(false);
+  const [pushing, setPushing] = useState(false);
+  const [pushProgress, setPushProgress] = useState<{ current: number; total: number; label: string } | null>(null);
+  const [pushResult, setPushResult] = useState<{ pushed: number; failed: number } | null>(null);
+
+  const handlePushToWwise = useCallback(async () => {
+    if (!connected || !window.wwiseSync || nodes.length === 0) return;
+    setPushing(true);
+    setPushResult(null);
+    setPushProgress(null);
+
+    window.wwiseSync.removeProgressListeners();
+    window.wwiseSync.onProgress((p) => setPushProgress(p));
+
+    try {
+      const res = await window.wwiseSync.pushAll(
+        nodes.map((n) => ({ id: n.id, type: n.type, data: n.data, position: n.position })),
+        edges
+      );
+      if (res.success && res.data) {
+        setPushResult({ pushed: res.data.totalPushed, failed: res.data.totalFailed });
+        // Update nodes with wwisePath/wwiseId from results
+        const store = useCanvasStore.getState();
+        for (const r of res.data.results) {
+          if (r.success && r.wwisePath) {
+            store.updateNodeData(r.nodeId, { wwisePath: r.wwisePath, wwiseId: r.wwiseId });
+          }
+        }
+      } else {
+        setPushResult({ pushed: 0, failed: nodes.length });
+      }
+    } catch (err: any) {
+      console.error('[Push] Error:', err);
+      setPushResult({ pushed: 0, failed: nodes.length });
+    } finally {
+      setPushing(false);
+      setPushProgress(null);
+      // Auto-hide result after 5s
+      setTimeout(() => setPushResult(null), 5000);
+    }
+  }, [connected, nodes, edges]);
 
   return (
     <div className="h-11 bg-panel border-b border-canvas-accent flex items-center px-4 gap-4 shrink-0">
@@ -76,6 +127,36 @@ export default function TopBar() {
       >
         Import Wwise
       </button>
+
+      {/* Push to Wwise Button */}
+      {connected && (
+        <button
+          onClick={handlePushToWwise}
+          disabled={pushing || nodes.length === 0}
+          className={`px-2.5 py-1 text-[11px] font-semibold rounded border transition-colors ${
+            pushing
+              ? 'bg-amber-600/20 text-amber-400 border-amber-500/30 cursor-wait'
+              : 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30 hover:bg-emerald-600/30'
+          } disabled:opacity-40`}
+        >
+          {pushing
+            ? pushProgress
+              ? `Pushing ${pushProgress.current}/${pushProgress.total}...`
+              : 'Pushing...'
+            : `Push to Wwise`}
+        </button>
+      )}
+
+      {/* Push Result Toast */}
+      {pushResult && (
+        <div className={`px-2 py-0.5 text-[10px] font-bold rounded-full border ${
+          pushResult.failed === 0
+            ? 'bg-emerald-600/20 text-emerald-400 border-emerald-500/30'
+            : 'bg-amber-600/20 text-amber-400 border-amber-500/30'
+        }`}>
+          {pushResult.pushed} pushed{pushResult.failed > 0 ? `, ${pushResult.failed} failed` : ''}
+        </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />

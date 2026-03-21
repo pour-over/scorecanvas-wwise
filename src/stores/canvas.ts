@@ -13,6 +13,15 @@ import {
 
 type ViewMode = 'detailed' | 'simple';
 
+interface VersionSnapshot {
+  timestamp: number;
+  label: string;
+  nodes: CanvasNode[];
+  edges: CanvasEdge[];
+  projectId: string | null;
+  levelId: string | null;
+}
+
 interface CanvasStore {
   // Graph state
   nodes: CanvasNode[];
@@ -46,6 +55,17 @@ interface CanvasStore {
   selectLevel: (id: string) => void;
   loadProject: (projectId: string) => void;
   loadLevel: (levelId: string) => void;
+
+  // Import / dynamic projects
+  addProject: (project: GameProject) => void;
+  addLevelToProject: (projectId: string, level: GameLevel) => void;
+
+  // Version history
+  versionHistory: VersionSnapshot[];
+  saveSnapshot: (label?: string) => void;
+  restoreSnapshot: (index: number) => void;
+  autoSaveEnabled: boolean;
+  setAutoSave: (enabled: boolean) => void;
 
   // Starter project
   loadStarterProject: () => void;
@@ -162,6 +182,58 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
       edges,
       currentLevelId: levelId,
       selectedLevelId: levelId,
+    });
+  },
+
+  addProject: (project) => {
+    set((state) => ({
+      projects: [...state.projects.filter((p) => p.id !== project.id), project],
+    }));
+  },
+
+  addLevelToProject: (projectId, level) => {
+    set((state) => ({
+      projects: state.projects.map((p) =>
+        p.id === projectId
+          ? { ...p, levels: [...p.levels.filter((l) => l.id !== level.id), level] }
+          : p
+      ),
+    }));
+  },
+
+  versionHistory: [],
+  autoSaveEnabled: true,
+  setAutoSave: (enabled) => set({ autoSaveEnabled: enabled }),
+
+  saveSnapshot: (label) => {
+    const state = get();
+    const snapshot: VersionSnapshot = {
+      timestamp: Date.now(),
+      label: label || new Date().toLocaleTimeString(),
+      nodes: JSON.parse(JSON.stringify(state.nodes)),
+      edges: JSON.parse(JSON.stringify(state.edges)),
+      projectId: state.currentProjectId,
+      levelId: state.currentLevelId,
+    };
+    set((s) => ({
+      versionHistory: [...s.versionHistory.slice(-49), snapshot], // keep last 50
+    }));
+    // Persist to localStorage
+    try {
+      const history = [...get().versionHistory];
+      localStorage.setItem('scorecanvas-version-history', JSON.stringify(history.slice(-20)));
+    } catch { /* quota exceeded — silently drop oldest */ }
+  },
+
+  restoreSnapshot: (index) => {
+    const { versionHistory } = get();
+    const snapshot = versionHistory[index];
+    if (!snapshot) return;
+    set({
+      nodes: snapshot.nodes,
+      edges: snapshot.edges,
+      currentProjectId: snapshot.projectId,
+      currentLevelId: snapshot.levelId,
     });
   },
 
