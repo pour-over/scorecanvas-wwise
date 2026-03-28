@@ -266,10 +266,16 @@ export class WwiseSyncEngine {
       }
     }
 
-    if (node.type === 'musicState' && node.data.intensity !== undefined) {
+    if (node.type === 'musicState') {
       try {
-        const volume = -96 + (node.data.intensity / 100) * 96;
-        await this.client.setProperty(path, '@Volume', volume);
+        if (node.data.volume !== undefined) {
+          // Direct dB value — use as-is
+          await this.client.setProperty(path, '@Volume', node.data.volume);
+        } else if (node.data.intensity !== undefined) {
+          // Map intensity (0-100) to volume (-96 to 0 dB)
+          const volume = -96 + (node.data.intensity / 100) * 96;
+          await this.client.setProperty(path, '@Volume', volume);
+        }
       } catch {}
     }
   }
