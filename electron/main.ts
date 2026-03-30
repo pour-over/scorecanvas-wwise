@@ -8,6 +8,8 @@ import { submitCover, getCoverStatus, generateCover, type CoverRequest } from '.
 import { analyzeAudio } from './services/audio-analysis.js';
 import { importWwiseProject, importFromWaapi, generateAssetManifest } from './services/wwise-import.js';
 import { WwiseSyncEngine } from './waapi/sync-engine.js';
+import { saveProject, saveProjectAs, openProject, newProject, getRecentProjects, scanWwiseOriginals } from './services/project-fs.js';
+import { syncAssetsToWwise, importAssetsIntoWwise, listAppAudioFiles } from './services/asset-sync.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -233,6 +235,68 @@ ipcMain.handle('push:all', async (_event, nodes: any[], edges: any[]) => {
     const result = await sync.pushAll(nodes, edges, (current, total, label) => {
       mainWindow?.webContents.send('push:progress', { current, total, label });
     });
+    return { success: true, data: result };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+// --- Project File System IPC ---
+ipcMain.handle('project:save', async (_event, data: any) => {
+  return saveProject(data);
+});
+
+ipcMain.handle('project:saveAs', async (_event, data: any) => {
+  return saveProjectAs(data);
+});
+
+ipcMain.handle('project:open', async () => {
+  return openProject();
+});
+
+ipcMain.handle('project:new', async (_event, name: string) => {
+  return { success: true, data: newProject(name) };
+});
+
+ipcMain.handle('project:recent', async () => {
+  return { success: true, data: getRecentProjects() };
+});
+
+ipcMain.handle('project:scanOriginals', async (_event, wwiseProjectPath: string) => {
+  return scanWwiseOriginals(wwiseProjectPath);
+});
+
+// --- Asset Sync IPC ---
+ipcMain.handle('assets:list', async () => {
+  const appAudioDir = path.join(__dirname, '..', 'audio');
+  return { success: true, data: listAppAudioFiles(appAudioDir) };
+});
+
+ipcMain.handle('assets:syncToWwise', async (_event, wwiseProjectPath: string) => {
+  const appAudioDir = path.join(__dirname, '..', 'audio');
+  try {
+    const result = await syncAssetsToWwise(appAudioDir, wwiseProjectPath, (current, total, file) => {
+      mainWindow?.webContents.send('assets:syncProgress', { current, total, file });
+    });
+    return { success: true, data: result };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('assets:importToWwise', async (_event, syncResultJson: string) => {
+  if (!waapiClient?.isConnected) {
+    return { success: false, error: 'Not connected to Wwise' };
+  }
+  try {
+    const syncResult = JSON.parse(syncResultJson);
+    const result = await importAssetsIntoWwise(
+      syncResult,
+      (uri, args, options) => waapiClient!.call(uri, args, options),
+      (current, total, file) => {
+        mainWindow?.webContents.send('assets:importProgress', { current, total, file });
+      }
+    );
     return { success: true, data: result };
   } catch (err: any) {
     return { success: false, error: err.message };

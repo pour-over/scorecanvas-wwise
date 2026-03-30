@@ -1,9 +1,11 @@
 import { useState, useRef, useCallback } from 'react';
 import { useCanvasStore } from '../stores/canvas';
 import { useWwiseStore } from '../stores/wwise';
+import { useUndoStore } from '../stores/undo';
 import type { CanvasNodeType } from '../types/canvas';
 import { getAssetsByCategory, CATEGORY_CONFIG } from '../data/audio-assets';
 import { PROJECTS, PROJECT_LEVELS } from '../data/starter-project';
+import NewProjectModal from './NewProjectModal';
 
 declare global {
   interface Window {
@@ -62,8 +64,10 @@ function CollapsibleSection({
 }
 
 export default function Sidebar() {
-  const { addNode, nodes, currentProjectId, currentLevelId, loadProject, loadLevel } = useCanvasStore();
+  const { addNode, nodes, edges, currentProjectId, currentLevelId, loadProject, loadLevel, createLevel } = useCanvasStore();
   const { connected, connect, disconnect, connecting } = useWwiseStore();
+  const { canUndo, canRedo, undo, redo } = useUndoStore();
+  const [showNewProject, setShowNewProject] = useState(false);
 
   const { projects } = useCanvasStore();
   // Merge starter projects with dynamically-added projects (imported from Wwise etc.)
@@ -98,11 +102,93 @@ export default function Sidebar() {
         )}
       </div>
 
+      {/* Project Actions */}
+      <div className="px-3 pb-1 flex items-center gap-1">
+        <button
+          onClick={() => setShowNewProject(true)}
+          className="flex-1 px-2 py-1 text-[9px] font-bold rounded border transition-colors bg-canvas-highlight/10 text-canvas-highlight border-canvas-highlight/30 hover:bg-canvas-highlight/20"
+          title="New Project"
+        >
+          + New
+        </button>
+        <button
+          onClick={async () => {
+            const pfs = (window as any).projectFS;
+            if (pfs?.save) {
+              const state = useCanvasStore.getState();
+              const currentProject = allProjects.find((p) => p.id === state.currentProjectId);
+              await pfs.save({
+                name: currentProject?.name || 'Untitled',
+                nodes: state.nodes,
+                edges: state.edges,
+                projectId: state.currentProjectId,
+                levelId: state.currentLevelId,
+                projects: state.projects,
+              });
+            } else {
+              useCanvasStore.getState().saveSnapshot('Manual save');
+            }
+          }}
+          className="px-2 py-1 text-[9px] font-bold rounded border transition-colors bg-canvas-accent/30 text-canvas-muted border-canvas-accent hover:bg-canvas-accent/50 hover:text-canvas-text"
+          title="Save Project (Cmd+S)"
+        >
+          Save
+        </button>
+        <button
+          onClick={async () => {
+            const pfs = (window as any).projectFS;
+            if (pfs?.open) {
+              const result = await pfs.open();
+              if (result.success && result.data) {
+                const store = useCanvasStore.getState();
+                store.setNodes(result.data.nodes || []);
+                store.setEdges(result.data.edges || []);
+                useUndoStore.getState().clearHistory();
+              }
+            }
+          }}
+          className="px-2 py-1 text-[9px] font-bold rounded border transition-colors bg-canvas-accent/30 text-canvas-muted border-canvas-accent hover:bg-canvas-accent/50 hover:text-canvas-text"
+          title="Open Project"
+        >
+          Open
+        </button>
+      </div>
+
+      {/* Undo/Redo */}
+      <div className="px-3 pb-2 flex items-center gap-1">
+        <button
+          onClick={() => undo()}
+          disabled={!canUndo()}
+          className="flex-1 px-2 py-0.5 text-[9px] font-mono rounded border transition-colors bg-canvas-bg text-canvas-muted border-canvas-accent hover:bg-canvas-accent/30 hover:text-canvas-text disabled:opacity-20 disabled:cursor-not-allowed"
+          title="Undo (Cmd+Z)"
+        >
+          Undo
+        </button>
+        <button
+          onClick={() => redo()}
+          disabled={!canRedo()}
+          className="flex-1 px-2 py-0.5 text-[9px] font-mono rounded border transition-colors bg-canvas-bg text-canvas-muted border-canvas-accent hover:bg-canvas-accent/30 hover:text-canvas-text disabled:opacity-20 disabled:cursor-not-allowed"
+          title="Redo (Cmd+Shift+Z)"
+        >
+          Redo
+        </button>
+      </div>
+
       {/* Level Tabs */}
       <div className="px-3 pb-2">
         <div className="flex items-center gap-1 mb-1">
           <span className="text-[8px] font-mono uppercase tracking-widest text-canvas-muted/60">Levels</span>
           <span className="text-[8px] font-mono bg-canvas-accent/40 text-canvas-muted rounded px-1">{currentLevels.length}</span>
+          <button
+            onClick={() => {
+              const name = prompt('Level name:');
+              if (name?.trim()) createLevel(name.trim());
+            }}
+            className="ml-auto text-[9px] text-canvas-highlight hover:text-canvas-highlight/80 font-bold"
+            title="Add Level"
+          >
+            +
+          </button>
         </div>
         <div className="flex flex-col gap-0.5">
           {currentLevels.map((level) => {
@@ -219,6 +305,8 @@ export default function Sidebar() {
           </div>
         </CollapsibleSection>
       </div>
+
+      {showNewProject && <NewProjectModal onClose={() => setShowNewProject(false)} />}
     </div>
   );
 }
