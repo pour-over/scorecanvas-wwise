@@ -1,6 +1,6 @@
 {
   "name": "scorecanvas-wwise",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "ScoreCanvas Wwise — The Ultimate Conversational Adaptive Music Workstation",
   "type": "module",
   "main": "dist-electron/main.js",
@@ -9,7 +9,61 @@
     "build": "tsc && vite build && tsc -p tsconfig.electron.json",
     "preview": "vite preview",
     "electron:dev": "tsc -p tsconfig.electron.json && tsc -p tsconfig.preload.json && concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
-    "electron:build": "npm run build && electron-builder"
+    "electron:build": "npm run build && electron-builder",
+    "electron:build:mac": "npm run build && electron-builder --mac",
+    "electron:build:win": "npm run build && electron-builder --win",
+    "electron:build:all": "npm run build && electron-builder --mac --win"
+  },
+  "build": {
+    "appId": "com.backpocketmusic.scorecanvas-wwise",
+    "productName": "ScoreCanvas Wwise",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "audio",
+        "to": "audio",
+        "filter": ["**/*"]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.music",
+      "target": [
+        { "target": "dmg", "arch": ["universal"] },
+        { "target": "zip", "arch": ["universal"] }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true
+    },
+    "fileAssociations": [
+      {
+        "ext": "scwwise",
+        "name": "ScoreCanvas Wwise Project",
+        "description": "ScoreCanvas Wwise Project File",
+        "mimeType": "application/x-scorecanvas-wwise",
+        "role": "Editor"
+      }
+    ]
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",

@@ -11,7 +11,55 @@ import {
   DEFAULT_LEVEL_ID,
 } from '../data/starter-project';
 
+// Lazy import to avoid circular dependency
+let _pushUndo: ((label: string) => void) | null = null;
+function pushUndo(label: string) {
+  if (!_pushUndo) {
+    import('./undo').then((m) => {
+      _pushUndo = m.useUndoStore.getState().pushUndo;
+      _pushUndo(label);
+    });
+  } else {
+    _pushUndo(label);
+  }
+}
+
 type ViewMode = 'detailed' | 'simple';
+
+/**
+ * Ensure nodes have minimum spacing between them.
+ * If nodes overlap or are too close, spread them out.
+ */
+function spreadNodes(nodes: CanvasNode[]): CanvasNode[] {
+  if (nodes.length <= 1) return nodes;
+  const MIN_X_GAP = 280;
+  const MIN_Y_GAP = 180;
+
+  // Check if nodes need spreading (any pair too close)
+  let needsSpread = false;
+  for (let i = 0; i < nodes.length && !needsSpread; i++) {
+    for (let j = i + 1; j < nodes.length; j++) {
+      const dx = Math.abs(nodes[i].position.x - nodes[j].position.x);
+      const dy = Math.abs(nodes[i].position.y - nodes[j].position.y);
+      if (dx < 60 && dy < 60) {
+        needsSpread = true;
+        break;
+      }
+    }
+  }
+
+  if (!needsSpread) return nodes;
+
+  // Auto-layout: arrange in a grid with proper spacing
+  const cols = Math.ceil(Math.sqrt(nodes.length * 1.5));
+  return nodes.map((node, i) => ({
+    ...node,
+    position: {
+      x: (i % cols) * MIN_X_GAP + 100,
+      y: Math.floor(i / cols) * MIN_Y_GAP + 100,
+    },
+  }));
+}
 
 interface VersionSnapshot {
   timestamp: number;
@@ -59,6 +107,7 @@ interface CanvasStore {
   // Import / dynamic projects
   addProject: (project: GameProject) => void;
   addLevelToProject: (projectId: string, level: GameLevel) => void;
+  createLevel: (name: string, subtitle?: string) => void;
 
   // Version history
   versionHistory: VersionSnapshot[];
@@ -108,6 +157,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   addNode: (type, position, data) => {
+    pushUndo('Add node');
     const id = uuid();
     const nodeData = { ...defaults[type], ...data };
     const node: CanvasNode = {
@@ -121,6 +171,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   updateNodeData: (nodeId, data) => {
+    pushUndo('Update node');
     set((state) => ({
       nodes: state.nodes.map((n) =>
         n.id === nodeId ? { ...n, data: { ...n.data, ...data } } : n
@@ -129,6 +180,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   removeNode: (nodeId) => {
+    pushUndo('Remove node');
     set((state) => ({
       nodes: state.nodes.filter((n) => n.id !== nodeId),
       edges: state.edges.filter((e) => e.source !== nodeId && e.target !== nodeId),
@@ -136,6 +188,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
   },
 
   connectNodes: (sourceId, targetId) => {
+    pushUndo('Connect nodes');
     const edgeId = `e-${sourceId}-${targetId}`;
     set((state) => ({
       edges: [...state.edges, { id: edgeId, source: sourceId, target: targetId }],
@@ -160,12 +213,27 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
 
   loadProject: (projectId: string) => {
     const levels = PROJECT_LEVELS[projectId];
-    if (!levels || levels.length === 0) return;
+    if (!levels || levels.length === 0) {
+      // Dynamic project — check store projects
+      const proj = get().projects.find((p) => p.id === projectId);
+      if (proj && proj.levels.length > 0) {
+        const firstLevel = proj.levels[0];
+        set({
+          nodes: spreadNodes(firstLevel.nodes || []),
+          edges: firstLevel.edges || [],
+          currentProjectId: projectId,
+          currentLevelId: firstLevel.id,
+          selectedProjectId: projectId,
+          selectedLevelId: firstLevel.id,
+        });
+      }
+      return;
+    }
     const firstLevel = levels[0];
     const nodes = LEVEL_NODES[firstLevel.id] || [];
     const edges = LEVEL_EDGES[firstLevel.id] || [];
     set({
-      nodes,
+      nodes: spreadNodes(nodes),
       edges,
       currentProjectId: projectId,
       currentLevelId: firstLevel.id,
@@ -178,7 +246,7 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
     const nodes = LEVEL_NODES[levelId] || [];
     const edges = LEVEL_EDGES[levelId] || [];
     set({
-      nodes,
+      nodes: spreadNodes(nodes),
       edges,
       currentLevelId: levelId,
       selectedLevelId: levelId,
@@ -199,6 +267,41 @@ export const useCanvasStore = create<CanvasStore>((set, get) => ({
           : p
       ),
     }));
+  },
+
+  createLevel: (name, subtitle) => {
+    const state = get();
+    if (!state.currentProjectId) return;
+    const levelId = `lvl-${uuid().slice(0, 8)}`;
+    const level: GameLevel = {
+      id: levelId,
+      name,
+      subtitle: subtitle || '',
+      region: '',
+      nodes: [],
+      edges: [],
+      assets: [],
+    };
+    // Add to the current project
+    const allProjects = [...PROJECTS, ...state.projects];
+    const project = allProjects.find((p) => p.id === state.currentProjectId);
+    if (project) {
+      // Add level to dynamic projects list
+      set((s) => ({
+        projects: s.projects.map((p) =>
+          p.id === state.currentProjectId
+            ? { ...p, levels: [...p.levels, level] }
+            : p
+        ),
+        nodes: [],
+        edges: [],
+        currentLevelId: levelId,
+        selectedLevelId: levelId,
+      }));
+      // Also register in LEVEL_NODES/EDGES for lookup
+      LEVEL_NODES[levelId] = [];
+      LEVEL_EDGES[levelId] = [];
+    }
   },
 
   versionHistory: [],

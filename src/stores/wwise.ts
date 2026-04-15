@@ -52,6 +52,14 @@ declare global {
       fromWaapi: () => Promise<{ success: boolean; data?: any; error?: string }>;
       getManifest: (projectPath: string) => Promise<{ success: boolean; data?: any; error?: string }>;
     };
+    projectFS?: {
+      save: (data: any) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+      saveAs: (data: any) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+      open: () => Promise<{ success: boolean; data?: any; filePath?: string; error?: string }>;
+      newProject: (name: string) => Promise<{ success: boolean; data?: any }>;
+      getRecent: () => Promise<{ success: boolean; data?: any[] }>;
+      scanWwiseOriginals: (path: string) => Promise<{ success: boolean; files?: any[]; error?: string }>;
+    };
     electronAPI?: {
       platform: string;
     };
@@ -67,12 +75,19 @@ export const useWwiseStore = create<WwiseStore>((set) => ({
   connect: async (url) => {
     set({ connecting: true, error: null });
     try {
+      // Read saved URL from settings
+      const savedSettings = localStorage.getItem('scorecanvas-settings');
+      const settings = savedSettings ? JSON.parse(savedSettings) : {};
+      const connectUrl = url || settings.waapiUrl || undefined;
+
       if (window.wwise) {
-        const result = await window.wwise.connect(url);
+        const result = await window.wwise.connect(connectUrl);
         if (result.success) {
           set({ connected: true, projectInfo: result.data, connecting: false });
         } else {
-          set({ error: result.error || 'Connection failed', connecting: false });
+          const errorMsg = result.error || 'Connection failed';
+          set({ error: errorMsg, connecting: false });
+          console.warn('[Wwise] Connection failed:', errorMsg);
         }
       } else {
         // Browser dev mode — simulate connection
@@ -88,7 +103,9 @@ export const useWwiseStore = create<WwiseStore>((set) => ({
         });
       }
     } catch (err: any) {
-      set({ error: err.message, connecting: false });
+      const errorMsg = err.message || 'Unknown connection error';
+      set({ error: errorMsg, connecting: false });
+      console.error('[Wwise] Connection error:', errorMsg);
     }
   },
 

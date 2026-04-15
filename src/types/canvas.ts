@@ -28,11 +28,11 @@ export interface MusicStateData {
   looping: boolean;
   stems: string[];
   asset?: string;
+  volume?: number;           // dB value (-96 to 12), set directly in Wwise
   wwisePath?: string;
   wwiseId?: string;
   directorNote?: string;
   status?: NodeStatus;
-  jiraTicket?: string;
 }
 
 export interface TransitionData {

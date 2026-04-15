@@ -9,11 +9,13 @@ import VersionHistory from './components/VersionHistory';
 import GuidedTour, { useShouldShowTour } from './components/GuidedTour';
 import { useCanvasStore } from './stores/canvas';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 
 export default function App() {
   const nodeCount = useCanvasStore((s) => s.nodes.length);
   const loadStarterProject = useCanvasStore((s) => s.loadStarterProject);
   useAutoSave();
+  useKeyboardShortcuts();
 
   const shouldShowTour = useShouldShowTour();
   const [showTour, setShowTour] = useState(false);
@@ -38,13 +40,15 @@ export default function App() {
         <TopBar />
 
         {/* Main Content */}
-        <div className="flex flex-1 overflow-hidden">
+        <div className="flex flex-1 min-h-0 overflow-hidden">
           {/* Left Sidebar */}
           <Sidebar />
 
           {/* Canvas */}
-          <div className="flex-1 relative">
-            <Canvas />
+          <div className="flex-1 relative overflow-hidden min-w-0">
+            <div className="absolute inset-0">
+              <Canvas />
+            </div>
             <TransportBar />
           </div>
 

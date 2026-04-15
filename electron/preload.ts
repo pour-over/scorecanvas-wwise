@@ -56,6 +56,27 @@ contextBridge.exposeInMainWorld('wwiseSync', {
   removeProgressListeners: () => ipcRenderer.removeAllListeners('push:progress'),
 });
 
+// Project File System (save/load/new)
+contextBridge.exposeInMainWorld('projectFS', {
+  save: (data: any) => ipcRenderer.invoke('project:save', data),
+  saveAs: (data: any) => ipcRenderer.invoke('project:saveAs', data),
+  open: () => ipcRenderer.invoke('project:open'),
+  newProject: (name: string) => ipcRenderer.invoke('project:new', name),
+  getRecent: () => ipcRenderer.invoke('project:recent'),
+  scanWwiseOriginals: (wwiseProjectPath: string) => ipcRenderer.invoke('project:scanOriginals', wwiseProjectPath),
+});
+
+// Asset Sync (copy to Wwise + import)
+contextBridge.exposeInMainWorld('assetSync', {
+  list: () => ipcRenderer.invoke('assets:list'),
+  syncToWwise: (wwiseProjectPath: string) => ipcRenderer.invoke('assets:syncToWwise', wwiseProjectPath),
+  importToWwise: (syncResult: string) => ipcRenderer.invoke('assets:importToWwise', syncResult),
+  onSyncProgress: (callback: (p: { current: number; total: number; file: string }) => void) =>
+    ipcRenderer.on('assets:syncProgress', (_e, p) => callback(p)),
+  onImportProgress: (callback: (p: { current: number; total: number; file: string }) => void) =>
+    ipcRenderer.on('assets:importProgress', (_e, p) => callback(p)),
+});
+
 // Platform info
 contextBridge.exposeInMainWorld('electronAPI', {
   platform: process.platform,
