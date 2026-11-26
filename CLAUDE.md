@@ -476,7 +476,7 @@ Claude: Reads the Wwise project via WAAPI, generates canvas nodes
 
 | Project | Location | What to Port |
 |---------|----------|-------------|
-| ScoreCanvas | `~/Desktop/ClaudeCode/ScoreCanvas` | All visual components, design system, node types, transport bar, sprites, audio engine |
+| ScoreCanvas | `~/Desktop/Projects/ClaudeCode/ScoreCanvas-v1-archive` | All visual components, design system, node types, transport bar, sprites, audio engine |
 | Wwise MCP v2 | `~/Downloads/wwise-music-mcp-v2` | All 35+ MCP tools, WAAPI patterns, batch operations, threat system |
 | Wwise MCP v1 | `~/.openclaw/workspace/wwise-music-mcp` | Foundational WAAPI client patterns |
 | Open Source | `github.com/pour-over/Wwise-MCP` | Public starting point, community patterns |
